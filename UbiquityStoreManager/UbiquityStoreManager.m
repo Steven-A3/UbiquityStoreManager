@@ -205,8 +205,9 @@ typedef NS_ENUM(NSUInteger, USMEnabledStore) {
     _storeOptions = storeOptions == nil? @{ }: storeOptions;
 
     // Private vars.
-    _currentIdentityToken = [[NSFileManager defaultManager] respondsToSelector:@selector(ubiquityIdentityToken)]?
-                            [[NSFileManager defaultManager] ubiquityIdentityToken]: nil;
+	NSFileManager *fileManager = [NSFileManager new];
+    _currentIdentityToken = [fileManager respondsToSelector:@selector(ubiquityIdentityToken)]?
+                            [fileManager ubiquityIdentityToken]: nil;
     _migrationStrategy = &NSPersistentStoreUbiquitousContainerIdentifierKey?
                          UbiquityStoreMigrationStrategyIOS: UbiquityStoreMigrationStrategyCopyEntities;
     _persistentStorageQueue = [NSOperationQueue new];
@@ -330,7 +331,7 @@ typedef NS_ENUM(NSUInteger, USMEnabledStore) {
 
     for (; cloudVersion >= 0; --cloudVersion) {
         NSString *storeUUIDPath = [self URLForCloudStoreUUIDForVersion:cloudVersion].path;
-        if ([[NSFileManager defaultManager] fileExistsAtPath:storeUUIDPath] &&
+        if ([[NSFileManager new] fileExistsAtPath:storeUUIDPath] &&
             (!forStoreUUID ||
              [[NSString stringWithContentsOfFile:storeUUIDPath encoding:NSUTF8StringEncoding error:nil]
                      isEqualToString:forStoreUUID]))
@@ -344,7 +345,7 @@ typedef NS_ENUM(NSUInteger, USMEnabledStore) {
 
 - (NSURL *)URLForApplicationContainer {
 
-    NSURL *applicationSupportURL = [[[NSFileManager defaultManager] URLsForDirectory:NSApplicationSupportDirectory
+    NSURL *applicationSupportURL = [[[NSFileManager new] URLsForDirectory:NSApplicationSupportDirectory
                                                                            inDomains:NSUserDomainMask] lastObject];
 
 #if TARGET_OS_IPHONE
@@ -355,7 +356,7 @@ typedef NS_ENUM(NSUInteger, USMEnabledStore) {
     applicationSupportURL = [applicationSupportURL URLByAppendingPathComponent:[NSRunningApplication currentApplication].bundleIdentifier isDirectory:YES];
 
     NSError *error = nil;
-    if (![[NSFileManager defaultManager] createDirectoryAtURL:applicationSupportURL
+    if (![[NSFileManager new] createDirectoryAtURL:applicationSupportURL
                                   withIntermediateDirectories:YES attributes:nil error:&error])
         [self error:error cause:UbiquityStoreErrorCauseCreateStorePath context:applicationSupportURL.path];
 
@@ -365,7 +366,7 @@ typedef NS_ENUM(NSUInteger, USMEnabledStore) {
 
 - (NSURL *)URLForCloudContainer {
 
-    return [[NSFileManager defaultManager] URLForUbiquityContainerIdentifier:self.containerIdentifier];
+    return [[NSFileManager new] URLForUbiquityContainerIdentifier:self.containerIdentifier];
 }
 
 /**
@@ -494,8 +495,9 @@ typedef NS_ENUM(NSUInteger, USMEnabledStore) {
     if (!cloudContentDirectory)
         return nil;
 
+	NSFileManager *fileManager = [NSFileManager new];
     NSError *error = nil;
-    NSArray *cloudContentURLs = [[NSFileManager defaultManager]
+    NSArray *cloudContentURLs = [fileManager
             contentsOfDirectoryAtURL:cloudContentDirectory includingPropertiesForKeys:nil
                              options:NSDirectoryEnumerationSkipsHiddenFiles error:&error];
     if (!cloudContentURLs) {
@@ -507,17 +509,17 @@ typedef NS_ENUM(NSUInteger, USMEnabledStore) {
     NSMutableDictionary *cloudStores = [NSMutableDictionary dictionary];
     for (NSURL *cloudContentURL in cloudContentURLs) {
         BOOL isDirectory = NO;
-        if (![[NSFileManager defaultManager] fileExistsAtPath:cloudContentURL.path isDirectory:&isDirectory] && !isDirectory)
+        if (![fileManager fileExistsAtPath:cloudContentURL.path isDirectory:&isDirectory] && !isDirectory)
             continue;
 
         NSString *storeUUID = [cloudContentURL lastPathComponent];
         NSURL *storeURL = [self URLForCloudStoreWithUUID:storeUUID];
 
         NSMutableArray *cloudStoreOptionSets = [NSMutableArray array];
-        NSArray *peerURLs = [[NSFileManager defaultManager] contentsOfDirectoryAtURL:cloudContentURL includingPropertiesForKeys:nil
+        NSArray *peerURLs = [fileManager contentsOfDirectoryAtURL:cloudContentURL includingPropertiesForKeys:nil
                                                                              options:NSDirectoryEnumerationSkipsHiddenFiles error:&error];
         for (NSURL *peerURL in peerURLs) {
-            NSArray *cloudContentNameURLs = [[NSFileManager defaultManager] contentsOfDirectoryAtURL:peerURL includingPropertiesForKeys:nil
+            NSArray *cloudContentNameURLs = [fileManager contentsOfDirectoryAtURL:peerURL includingPropertiesForKeys:nil
                                                                                              options:NSDirectoryEnumerationSkipsHiddenFiles
                                                                                                error:&error];
             for (NSURL *cloudContentNameURL in cloudContentNameURLs) {
@@ -875,7 +877,7 @@ typedef NS_ENUM(NSUInteger, USMEnabledStore) {
                         shouldMigrateFromStoreURL:migrationStoreURL toStoreURL:localStoreURL
                                           isCloud:NO]) ||
             // Migration OK'ed by application, make sure destination store doesn't exist.
-            [[NSFileManager defaultManager] fileExistsAtPath:localStoreURL.path])
+            [[NSFileManager new] fileExistsAtPath:localStoreURL.path])
             migrationStrategy = UbiquityStoreMigrationStrategyNone;
         else
             [self log:@"Will migrate to local store from: %@ (strategy: %d).", [migrationStoreURL lastPathComponent], migrationStrategy];
@@ -1000,13 +1002,14 @@ typedef NS_ENUM(NSUInteger, USMEnabledStore) {
     else {
         // iOS 6
         // Clean up the cloud store if the cloud content got deleted.
-        BOOL storeExists = [[NSFileManager defaultManager] fileExistsAtPath:cloudStoreURL.path];
-        BOOL storeContentExists = [[NSFileManager defaultManager] startDownloadingUbiquitousItemAtURL:cloudStoreContentURL error:nil];
+		NSFileManager *fileManager = [NSFileManager new];
+        BOOL storeExists = [fileManager fileExistsAtPath:cloudStoreURL.path];
+        BOOL storeContentExists = [fileManager startDownloadingUbiquitousItemAtURL:cloudStoreContentURL error:nil];
         if (storeExists && !storeContentExists) {
             // We have a cloud store but no cloud content.  The cloud content was deleted:
             // The existing store cannot sync anymore and needs to be recreated.
             [self log:@"Deleting cloud store: it has no cloud content."];
-            [[NSFileManager defaultManager] removeItemAtURL:cloudStoreURL error:nil];
+            [fileManager removeItemAtURL:cloudStoreURL error:nil];
         }
     }
 
@@ -1033,7 +1036,7 @@ typedef NS_ENUM(NSUInteger, USMEnabledStore) {
     else if ([[migrationStoreURL absoluteString] rangeOfString:USMCloudStoreDirectory].location != NSNotFound)
             // Migration store is a regular cloud store.
         migrationStoreOptions = [self optionsForCloudStoreURL:migrationStoreURL];
-    else if ([[NSFileManager defaultManager] fileExistsAtPath:migrationStoreURL.path]) {
+    else if ([[NSFileManager new] fileExistsAtPath:migrationStoreURL.path]) {
         // Migration store is something else.
         migrationStoreOptions = [self optionsForLocalStore];
         migrationStoreOptions[NSReadOnlyPersistentStoreOption] = @YES;
@@ -1098,13 +1101,14 @@ typedef NS_ENUM(NSUInteger, USMEnabledStore) {
         IfOut(cause, UbiquityStoreErrorCauseNoError);
 
         // If the migration store is read-only, copy it so we can open it without read-only to migrate its model if necessary.
+		NSFileManager *fileManager = [NSFileManager new];
         if ([migrationStoreOptions[NSReadOnlyPersistentStoreOption] isEqual:@YES] &&
-            [[NSFileManager defaultManager] fileExistsAtPath:migrationStoreURL.path]) {
+            [fileManager fileExistsAtPath:migrationStoreURL.path]) {
             NSMutableDictionary *migrationWorkStoreOptions = [migrationStoreOptions mutableCopy];
             migrationWorkStoreURL = [[[migrationStoreURL URLByDeletingLastPathComponent]
                     URLByAppendingPathComponent:@"CopyMigrationStore" isDirectory:NO] URLByAppendingPathExtension:@"sqlite"];
-            [[NSFileManager defaultManager] removeItemAtURL:migrationWorkStoreURL error:nil];
-            if (![[NSFileManager defaultManager] copyItemAtURL:migrationStoreURL toURL:migrationWorkStoreURL error:&error]) {
+            [fileManager removeItemAtURL:migrationWorkStoreURL error:nil];
+            if (![fileManager copyItemAtURL:migrationStoreURL toURL:migrationWorkStoreURL error:&error]) {
                 [self error:IfOut(outError, error) cause:IfOut(cause, UbiquityStoreErrorCauseOpenSeedStore)
                     context:IfOut(context, migrationStoreURL.path)];
                 return NO;
@@ -1126,7 +1130,7 @@ typedef NS_ENUM(NSUInteger, USMEnabledStore) {
         // Make sure the store directories exist.
         NSURL *migrationStoreDirectoryURL = [migrationStoreURL URLByDeletingLastPathComponent];
         if (migrationStoreDirectoryURL &&
-            ![[NSFileManager defaultManager] createDirectoryAtURL:migrationStoreDirectoryURL
+            ![fileManager createDirectoryAtURL:migrationStoreDirectoryURL
                                       withIntermediateDirectories:YES attributes:nil error:&error]) {
             [self error:IfOut(outError, error) cause:IfOut(cause, UbiquityStoreErrorCauseCreateStorePath)
                 context:IfOut(context, migrationStoreDirectoryURL.path)];
@@ -1134,7 +1138,7 @@ typedef NS_ENUM(NSUInteger, USMEnabledStore) {
         }
         NSURL *targetStoreDirectoryURL = [targetStoreURL URLByDeletingLastPathComponent];
         if (targetStoreDirectoryURL &&
-            ![[NSFileManager defaultManager] createDirectoryAtURL:targetStoreDirectoryURL
+            ![fileManager createDirectoryAtURL:targetStoreDirectoryURL
                                       withIntermediateDirectories:YES attributes:nil error:&error]) {
             [self error:IfOut(outError, error) cause:IfOut(cause, UbiquityStoreErrorCauseCreateStorePath)
                 context:IfOut(context, targetStoreDirectoryURL.path)];
@@ -1153,7 +1157,7 @@ typedef NS_ENUM(NSUInteger, USMEnabledStore) {
                                     toStore:targetStoreURL withOptions:targetStoreOptions
                                       error:&error cause:cause context:context]) {
                     IfOut(outError, error);
-                    [[NSFileManager defaultManager] removeItemAtURL:targetStoreURL error:nil];
+                    [fileManager removeItemAtURL:targetStoreURL error:nil];
                     return NO;
                 }
 
@@ -1181,7 +1185,7 @@ typedef NS_ENUM(NSUInteger, USMEnabledStore) {
                                                                     withType:NSSQLiteStoreType error:&error]) {
                     [self error:IfOut(outError, error) cause:IfOut(cause, UbiquityStoreErrorCauseSeedStore)
                         context:IfOut(context, targetStoreURL.path)];
-                    [[NSFileManager defaultManager] removeItemAtURL:targetStoreURL error:nil];
+                    [fileManager removeItemAtURL:targetStoreURL error:nil];
                     return NO;
                 }
 
@@ -1200,7 +1204,7 @@ typedef NS_ENUM(NSUInteger, USMEnabledStore) {
                     // Handle failure by cleaning up the target store.
                     [self error:IfOut(outError, error) cause:IfOut(cause, UbiquityStoreErrorCauseSeedStore)
                         context:IfOut(context, migrationStoreURL.path)];
-                    [[NSFileManager defaultManager] removeItemAtURL:targetStoreURL error:nil];
+                    [fileManager removeItemAtURL:targetStoreURL error:nil];
                     return NO;
                 }
 
@@ -1217,7 +1221,7 @@ typedef NS_ENUM(NSUInteger, USMEnabledStore) {
     }
     @finally {
         if (migrationWorkStoreURL)
-            [[NSFileManager defaultManager] removeItemAtURL:migrationWorkStoreURL error:nil];
+            [[NSFileManager new] removeItemAtURL:migrationWorkStoreURL error:nil];
     }
 
     return NO;
@@ -1365,18 +1369,19 @@ typedef NS_ENUM(NSUInteger, USMEnabledStore) {
             coordinateWritingItemAtURL:directoryURL options:NSFileCoordinatorWritingForDeleting
                                  error:&error byAccessor:
             ^(NSURL *newURL) {
-                if (![[NSFileManager defaultManager] fileExistsAtPath:newURL.path]) {
+				NSFileManager *fileManager = [NSFileManager new];
+                if (![fileManager fileExistsAtPath:newURL.path]) {
                     success = YES;
                     return;
                 }
 
                 NSError *error_ = nil;
-                if (localOnly && [[NSFileManager defaultManager] isUbiquitousItemAtURL:newURL]) {
-                    if (![[NSFileManager defaultManager] evictUbiquitousItemAtURL:newURL error:&error_])
+                if (localOnly && [[NSFileManager new] isUbiquitousItemAtURL:newURL]) {
+                    if (![fileManager evictUbiquitousItemAtURL:newURL error:&error_])
                         [self error:error_ cause:UbiquityStoreErrorCauseDeleteStore context:newURL.path];
                 }
                 else {
-                    if (![[NSFileManager defaultManager] removeItemAtURL:newURL error:&error_])
+                    if (![fileManager removeItemAtURL:newURL error:&error_])
                         [self error:error_ cause:UbiquityStoreErrorCauseDeleteStore context:newURL.path];
                 }
 
@@ -1495,7 +1500,7 @@ typedef NS_ENUM(NSUInteger, USMEnabledStore) {
         [self.storeFilePresenter.coordinator coordinateWritingItemAtURL:[self URLForLocalStore] options:NSFileCoordinatorWritingForDeleting
                                                                   error:&coordinationError byAccessor:^(NSURL *newURL) {
             NSError *error = nil;
-            if (![[NSFileManager defaultManager] removeItemAtURL:newURL error:&error])
+            if (![[NSFileManager new] removeItemAtURL:newURL error:&error])
                 [self error:error cause:UbiquityStoreErrorCauseDeleteStore context:[newURL path]];
         }];
         if (coordinationError)
@@ -1545,7 +1550,7 @@ typedef NS_ENUM(NSUInteger, USMEnabledStore) {
         return NO;
 
     NSURL *localStoreURL = self.localStoreURL;
-    if (![[NSFileManager defaultManager] fileExistsAtPath:localStoreURL.path]) {
+    if (![[NSFileManager new] fileExistsAtPath:localStoreURL.path]) {
         [self logError:@"Cannot migrate local to cloud: Local store doesn't exist."
                  cause:UbiquityStoreErrorCauseSeedStore context:localStoreURL.path];
         return NO;
@@ -1581,8 +1586,9 @@ typedef NS_ENUM(NSUInteger, USMEnabledStore) {
     if ([cloudContentURL isKindOfClass:[NSString class]])
         cloudContentURL = [[self URLForCloudContentDirectory] URLByAppendingPathComponent:self.storeUUID isDirectory:YES];
 
-    if (![[NSFileManager defaultManager] fileExistsAtPath:cloudContentURL.path] &&
-        ![[NSFileManager defaultManager] fileExistsAtPath:cloudStoreURL.path]) {
+	NSFileManager *fileManager = [NSFileManager new];
+    if (![fileManager fileExistsAtPath:cloudContentURL.path] &&
+        ![fileManager fileExistsAtPath:cloudStoreURL.path]) {
         // Cloud content not found.
         if (allowRebuildFromLocalStore) {
             [self log:@"Cannot rebuild cloud content: Cloud store doesn't exist.  Will rebuild from local store."];
@@ -1595,7 +1601,7 @@ typedef NS_ENUM(NSUInteger, USMEnabledStore) {
         }
     }
 
-    if (![[NSFileManager defaultManager] fileExistsAtPath:cloudStoreURL.path]) {
+    if (![fileManager fileExistsAtPath:cloudStoreURL.path]) {
         // iOS 7+
         [self log:@"Will rebuild cloud content from the cloud store (using cloud logs)."];
         self.migrationStoreURL = [self URLForCloudStore];
@@ -1615,8 +1621,8 @@ typedef NS_ENUM(NSUInteger, USMEnabledStore) {
 
         NSError *error = nil;
         self.migrationStoreURL = [[self URLForCloudStoreDirectory] URLByAppendingPathComponent:USMCloudStoreMigrationSource isDirectory:NO];
-        [[NSFileManager defaultManager] removeItemAtURL:self.migrationStoreURL error:nil];
-        if (![[NSFileManager defaultManager] copyItemAtURL:cloudStoreURL toURL:self.migrationStoreURL error:&error]) {
+        [fileManager removeItemAtURL:self.migrationStoreURL error:nil];
+        if (![fileManager copyItemAtURL:cloudStoreURL toURL:self.migrationStoreURL error:&error]) {
             [self error:error cause:UbiquityStoreErrorCauseSeedStore context:self.migrationStoreURL.path];
             // Migration failed, revert to previous store.
             [self revertMigration:cloudWasEnabled];
@@ -1718,7 +1724,7 @@ typedef NS_ENUM(NSUInteger, USMEnabledStore) {
         return NO;
 
     // Copy cloud to local store?
-    BOOL overwriteLocal = [[NSFileManager defaultManager] fileExistsAtPath:self.localStoreURL.path];
+    BOOL overwriteLocal = [[NSFileManager new] fileExistsAtPath:self.localStoreURL.path];
     if (overwriteLocal) {
         [self.persistentStoreCoordinator unlock];
         overwriteLocal = [self dispatchAndWaitFor:confirmationBlock];
@@ -1800,7 +1806,7 @@ typedef NS_ENUM(NSUInteger, USMEnabledStore) {
     NSError *coordinationError = nil;
     [self.storeUUIDPresenter.coordinator coordinateReadingItemAtURL:storeUUIDFile options:0
                                                               error:&coordinationError byAccessor:^(NSURL *newURL) {
-        if (![[NSFileManager defaultManager] fileExistsAtPath:[newURL path]])
+        if (![[NSFileManager new] fileExistsAtPath:[newURL path]])
             return;
 
         NSError *readError = nil;
@@ -1855,7 +1861,7 @@ typedef NS_ENUM(NSUInteger, USMEnabledStore) {
     [self.storeUUIDPresenter.coordinator coordinateWritingItemAtURL:storeUUIDFile options:NSFileCoordinatorWritingForMerging
                                                               error:nil byAccessor:^(NSURL *newURL) {
         NSError *error = nil;
-        if (![[NSFileManager defaultManager] createDirectoryAtURL:[newURL URLByDeletingLastPathComponent] withIntermediateDirectories:YES
+        if (![[NSFileManager new] createDirectoryAtURL:[newURL URLByDeletingLastPathComponent] withIntermediateDirectories:YES
                                                        attributes:nil error:&error])
             [self error:error cause:UbiquityStoreErrorCauseConfirmActiveStore context:[[newURL URLByDeletingLastPathComponent] path]];
         if (!(success = [newStoreUUID writeToURL:newURL atomically:NO encoding:NSASCIIStringEncoding error:&error]))
@@ -1873,7 +1879,7 @@ typedef NS_ENUM(NSUInteger, USMEnabledStore) {
             [self.storeUUIDPresenter.coordinator coordinateWritingItemAtURL:obsoleteStoreUUIDFile
                                                                     options:NSFileCoordinatorWritingForDeleting error:nil byAccessor:
                     ^(NSURL *newURL) {
-                        [[NSFileManager defaultManager] removeItemAtURL:newURL error:nil];
+                        [[NSFileManager new] removeItemAtURL:newURL error:nil];
                     }];
         }
     }
@@ -1882,7 +1888,7 @@ typedef NS_ENUM(NSUInteger, USMEnabledStore) {
     [self.corruptedUUIDPresenter.coordinator coordinateWritingItemAtURL:[self URLForCloudCorruptedUUIDForVersion:cloudVersion]
                                                                 options:NSFileCoordinatorWritingForDeleting error:nil byAccessor:
             ^(NSURL *newURL) {
-                [[NSFileManager defaultManager] removeItemAtURL:newURL error:nil];
+                [[NSFileManager new] removeItemAtURL:newURL error:nil];
             }];
 }
 
@@ -1980,24 +1986,25 @@ typedef NS_ENUM(NSUInteger, USMEnabledStore) {
 
         NSError *error = nil;
         NSURL *cloudStoreURL = [self URLForCloudStore];
-        if ([[NSFileManager defaultManager] fileExistsAtPath:[cloudStoreURL path]] &&
-            ![[NSFileManager defaultManager] removeItemAtURL:cloudStoreURL error:&error])
+		NSFileManager *fileManager = [NSFileManager new];
+        if ([fileManager fileExistsAtPath:[cloudStoreURL path]] &&
+            ![fileManager removeItemAtURL:cloudStoreURL error:&error])
             [self error:error cause:UbiquityStoreErrorCauseDeleteStore context:[cloudStoreURL path]];
         [self removeItemAtURL:cloudStoreURL localOnly:NO];
         [self.storeUUIDPresenter.coordinator coordinateWritingItemAtURL:[self URLForCloudStoreUUID]
                                                                 options:NSFileCoordinatorWritingForDeleting
                                                                   error:nil byAccessor:^(NSURL *newURL) {
             NSError *error_ = nil;
-            if ([[NSFileManager defaultManager] fileExistsAtPath:[newURL path]] &&
-                ![[NSFileManager defaultManager] removeItemAtURL:newURL error:&error_])
+            if ([fileManager fileExistsAtPath:[newURL path]] &&
+                ![fileManager removeItemAtURL:newURL error:&error_])
                 [self error:error_ cause:UbiquityStoreErrorCauseDeleteStore context:[newURL path]];
         }];
         [self.corruptedUUIDPresenter.coordinator coordinateWritingItemAtURL:[self URLForCloudCorruptedUUID]
                                                                     options:NSFileCoordinatorWritingForDeleting
                                                                       error:nil byAccessor:^(NSURL *newURL) {
             NSError *error_ = nil;
-            if ([[NSFileManager defaultManager] fileExistsAtPath:[newURL path]] &&
-                ![[NSFileManager defaultManager] removeItemAtURL:newURL error:&error_])
+            if ([fileManager fileExistsAtPath:[newURL path]] &&
+                ![fileManager removeItemAtURL:newURL error:&error_])
                 [self error:error_ cause:UbiquityStoreErrorCauseDeleteStore context:[newURL path]];
         }];
     } waitUntilFinished:YES];
@@ -2036,8 +2043,9 @@ typedef NS_ENUM(NSUInteger, USMEnabledStore) {
 - (void)applicationDidBecomeActive:(NSNotification *)note {
 
     // Check for iCloud identity changes (ie. user logs into another iCloud account).
-    if ([[NSFileManager defaultManager] respondsToSelector:@selector(ubiquityIdentityToken)] &&
-        ![self.currentIdentityToken isEqual:[[NSFileManager defaultManager] ubiquityIdentityToken]])
+	NSFileManager *fileManager = [NSFileManager new];
+    if ([fileManager respondsToSelector:@selector(ubiquityIdentityToken)] &&
+        ![self.currentIdentityToken isEqual:[fileManager ubiquityIdentityToken]])
         [self cloudStoreChanged:nil];
 }
 
@@ -2079,7 +2087,7 @@ typedef NS_ENUM(NSUInteger, USMEnabledStore) {
     [self.corruptedUUIDPresenter.coordinator coordinateWritingItemAtURL:corruptedUUIDFile options:NSFileCoordinatorWritingForMerging
                                                                   error:nil byAccessor:^(NSURL *newURL) {
         NSError *error = nil;
-        if (![[NSFileManager defaultManager] createDirectoryAtURL:[newURL URLByDeletingLastPathComponent] withIntermediateDirectories:YES
+        if (![[NSFileManager new] createDirectoryAtURL:[newURL URLByDeletingLastPathComponent] withIntermediateDirectories:YES
                                                        attributes:nil error:&error])
             [self error:error cause:UbiquityStoreErrorCauseCorruptActiveStore context:[[newURL URLByDeletingLastPathComponent] path]];
         if (![self.localCloudStoreCorruptedUUID writeToURL:newURL atomically:NO encoding:NSASCIIStringEncoding error:&error])
@@ -2103,7 +2111,7 @@ typedef NS_ENUM(NSUInteger, USMEnabledStore) {
     NSURL *corruptedUUIDFile = [self URLForCloudCorruptedUUID];
     [self.corruptedUUIDPresenter.coordinator coordinateReadingItemAtURL:corruptedUUIDFile options:0 error:&error byAccessor:
             ^(NSURL *newURL) {
-                if ([[NSFileManager defaultManager] fileExistsAtPath:[newURL path]])
+                if ([[NSFileManager new] fileExistsAtPath:[newURL path]])
                     corruptedUUID = [[NSString alloc] initWithContentsOfURL:newURL encoding:NSASCIIStringEncoding error:&error_];
             }];
 
@@ -2155,7 +2163,7 @@ typedef NS_ENUM(NSUInteger, USMEnabledStore) {
 - (void)cloudStoreChanged:(NSNotification *)note {
 
     // Update the identity token in case it changed.
-    id newIdentityToken = [[NSFileManager defaultManager] ubiquityIdentityToken];
+    id newIdentityToken = [[NSFileManager new] ubiquityIdentityToken];
     if (![self.currentIdentityToken isEqual:newIdentityToken] || (self.currentIdentityToken == nil && newIdentityToken)) {
         [self log:@"Identity token changed: %@ -> %@", self.currentIdentityToken, newIdentityToken];
         self.currentIdentityToken = newIdentityToken;
