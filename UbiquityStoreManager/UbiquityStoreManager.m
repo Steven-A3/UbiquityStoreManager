@@ -1097,11 +1097,11 @@ typedef NS_ENUM(NSUInteger, USMEnabledStore) {
 
     NSError *error = nil;
     NSURL *migrationWorkStoreURL = nil;
+	NSFileManager *fileManager = [NSFileManager new];
     @try {
         IfOut(cause, UbiquityStoreErrorCauseNoError);
 
         // If the migration store is read-only, copy it so we can open it without read-only to migrate its model if necessary.
-		NSFileManager *fileManager = [NSFileManager new];
         if ([migrationStoreOptions[NSReadOnlyPersistentStoreOption] isEqual:@YES] &&
             [fileManager fileExistsAtPath:migrationStoreURL.path]) {
             NSMutableDictionary *migrationWorkStoreOptions = [migrationStoreOptions mutableCopy];
@@ -1221,7 +1221,7 @@ typedef NS_ENUM(NSUInteger, USMEnabledStore) {
     }
     @finally {
         if (migrationWorkStoreURL)
-            [[NSFileManager new] removeItemAtURL:migrationWorkStoreURL error:nil];
+            [fileManager removeItemAtURL:migrationWorkStoreURL error:nil];
     }
 
     return NO;
